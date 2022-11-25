@@ -22,6 +22,7 @@ export class DataConverter {
   private _uniqueItems: IfcToFragmentUniqueItems = {};
   private _units = new Units();
   private _boundingBoxes: { [id: string]: number[] } = {};
+  private _transparentBoundingBoxes: { [id: string]: number[] } = {};
   private _bounds: { [id: string]: THREE.Box3[] } = {};
   // private _voxels: [number, number, number, string[]][] = [];
 
@@ -44,6 +45,7 @@ export class DataConverter {
     this._model = new FragmentGroup();
     this._uniqueItems = {};
     this._boundingBoxes = {};
+    this._transparentBoundingBoxes = {};
   }
 
   cleanUp() {
@@ -91,6 +93,7 @@ export class DataConverter {
 
   private saveModelData(webIfc: WEBIFC.IfcAPI) {
     this._model.boundingBoxes = this._boundingBoxes;
+    this._model.transparentBoundingBoxes = this._transparentBoundingBoxes;
     this._model.levelRelationships = this._spatialStructure.itemsByFloor;
     this._model.floorsProperties = this._spatialStructure.floorProperties;
     this._model.allTypes = IfcCategoryMap;
@@ -111,7 +114,7 @@ export class DataConverter {
     const categoryID = this._categories[id];
     const isUnique = data.instances.length === 1;
     const isInstanced = this._settings.instancedCategories.has(categoryID);
-    if (!isUnique || isInstanced) {
+    if ((!isUnique || isInstanced) || (isUnique && data.instances[0].voids)) {
       this.processInstancedItems(data);
     } else {
       this.processMergedItems(data);
@@ -163,6 +166,9 @@ export class DataConverter {
     this._model.fragments.push(fragment);
     this._model.add(fragment.mesh);
 
+    let hasVoids = false;
+    if (data.instances.length == 1) { hasVoids = data.instances[0].voids; }
+
     let isTransparent = false;
     const materialIDs = Object.keys(data.geometriesByMaterial);
     const mats = materialIDs.map((id) => this._materials[id]);
@@ -171,11 +177,6 @@ export class DataConverter {
         isTransparent = true;
       }
     }
-
-    if (isTransparent) {
-      return;
-    }
-
     const baseHelper = this.getTransformHelper([fragment.mesh.geometry]);
 
     for (let i = 0; i < fragment.mesh.count; i++) {
@@ -186,7 +187,12 @@ export class DataConverter {
       instanceHelper.applyMatrix4(instanceTransform);
       instanceHelper.updateMatrix();
       const id = fragment.getItemID(i, 0);
-      this._boundingBoxes[id] = instanceHelper.matrix.elements;
+      if (isTransparent || hasVoids) {
+        this._transparentBoundingBoxes[id] = instanceHelper.matrix.elements;
+      }
+      else {
+        this._boundingBoxes[id] = instanceHelper.matrix.elements;
+      }
 
       const guid = fragment.mesh.uuid;
       const max = new THREE.Vector3(0.5, 0.5, 0.5);
@@ -271,9 +277,6 @@ export class DataConverter {
     const geometries = Object.values(this._uniqueItems[category][level]);
     const { buffer, ids } = this.processIDsAndBuffer(geometries);
     const mats = this.getUniqueItemMaterial(category, level);
-
-    console.log(geometries, ids.size);
-
     const items: { [id: number]: BufferGeometry[] } = {};
 
     for (const geometryGroup of geometries) {

@@ -92,7 +92,8 @@
 		// downloadFragment(model);
 
 		console.log(model.boundingBoxes);
-
+		console.log(model.transparentBoundingBoxes);
+		
 		const boxes = Object.values(model.boundingBoxes);
 		const geometry = new THREE.BoxGeometry();
 		const material = new THREE.MeshLambertMaterial({color: "red", transparent: true, opacity: 0.5, depthTest: false});
@@ -102,6 +103,16 @@
 			tempMatrix.fromArray(boxes[i]);
 			mesh.setMatrixAt(i, tempMatrix);
     }
+	const boxes2 = Object.values(model.transparentBoundingBoxes);
+				const geometry2 = new THREE.BoxGeometry();
+				const material2 = new THREE.MeshLambertMaterial({ color: "blue", transparent: true, opacity: 0.5, depthTest: false });
+				const mesh2 = new THREE.InstancedMesh(geometry2, material2, boxes2.length);
+				const tempMatrix2 = new THREE.Matrix4();
+				for (let i = 0; i < boxes2.length; i++) {
+					tempMatrix2.fromArray(boxes2[i]);
+					mesh2.setMatrixAt(i, tempMatrix2);
+				}
+				scene.add(mesh2);
 		scene.add(mesh);
 	}
 

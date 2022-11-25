@@ -7,6 +7,8 @@ export class Geometry {
   private referenceMatrix = new THREE.Matrix4();
   private isFirstMatrix = true;
   private _materials: MaterialList;
+  private _voidsList: any = [];
+
   private _geometriesByMaterial: {
     [color: string]: THREE.BufferGeometry[];
   } = {};
@@ -21,6 +23,10 @@ export class Geometry {
     this.webIfc = webIfc;
     this._items = items;
     this._materials = materials;
+  }
+
+  setVoids(voidsList: any = []) {
+    this._voidsList = voidsList;
   }
 
   streamMesh(webifc: WEBIFC.IfcAPI, mesh: WEBIFC.FlatMesh) {
@@ -50,9 +56,12 @@ export class Geometry {
     const geometryData = mesh.geometries.get(0);
     const transform = Geometry.getMeshMatrix(geometryData);
     transform.multiply(referenceMatrix);
+    let hasVoids = true;
+    if (this._voidsList.indexOf(mesh.expressID) == -1) { hasVoids = false; }
     this._items[geometryID].instances.push({
       id: mesh.expressID,
       matrix: transform,
+      voids: hasVoids
     });
   }
 
@@ -69,11 +78,14 @@ export class Geometry {
   }
 
   private saveGeometryInstances(geometryID: string, mesh: WEBIFC.FlatMesh) {
+    let hasVoids = true;
+    if (this._voidsList.indexOf(mesh.expressID) == -1) { hasVoids = false; }
     this._items[geometryID] = {
       instances: [
         {
           id: mesh.expressID,
           matrix: new THREE.Matrix4(),
+          voids: hasVoids
         },
       ],
       geometriesByMaterial: this._geometriesByMaterial,

@@ -66558,11 +66558,15 @@ class Geometry {
     constructor(webIfc, items, materials) {
         this.referenceMatrix = new THREE$1.Matrix4();
         this.isFirstMatrix = true;
+        this._voidsList = [];
         this._geometriesByMaterial = {};
         this._items = {};
         this.webIfc = webIfc;
         this._items = items;
         this._materials = materials;
+    }
+    setVoids(voidsList = []) {
+        this._voidsList = voidsList;
     }
     streamMesh(webifc, mesh) {
         this.reset(webifc);
@@ -66589,9 +66593,14 @@ class Geometry {
         const geometryData = mesh.geometries.get(0);
         const transform = Geometry.getMeshMatrix(geometryData);
         transform.multiply(referenceMatrix);
+        let hasVoids = true;
+        if (this._voidsList.indexOf(mesh.expressID) == -1) {
+            hasVoids = false;
+        }
         this._items[geometryID].instances.push({
             id: mesh.expressID,
             matrix: transform,
+            voids: hasVoids
         });
     }
     generateBufferGeometries(mesh, geometryID) {
@@ -66607,11 +66616,16 @@ class Geometry {
         this.saveGeometryInstances(geometryID, mesh);
     }
     saveGeometryInstances(geometryID, mesh) {
+        let hasVoids = true;
+        if (this._voidsList.indexOf(mesh.expressID) == -1) {
+            hasVoids = false;
+        }
         this._items[geometryID] = {
             instances: [
                 {
                     id: mesh.expressID,
                     matrix: new THREE$1.Matrix4(),
+                    voids: hasVoids
                 },
             ],
             geometriesByMaterial: this._geometriesByMaterial,
@@ -67798,6 +67812,7 @@ class DataConverter {
         this._uniqueItems = {};
         this._units = new Units();
         this._boundingBoxes = {};
+        this._transparentBoundingBoxes = {};
         this._bounds = {};
         this._spatialStructure = new SpatialStructure();
         this._items = items;
@@ -67808,6 +67823,7 @@ class DataConverter {
         this._model = new FragmentGroup();
         this._uniqueItems = {};
         this._boundingBoxes = {};
+        this._transparentBoundingBoxes = {};
     }
     cleanUp() {
         this._spatialStructure.cleanUp();
@@ -67846,6 +67862,7 @@ class DataConverter {
     }
     saveModelData(webIfc) {
         this._model.boundingBoxes = this._boundingBoxes;
+        this._model.transparentBoundingBoxes = this._transparentBoundingBoxes;
         this._model.levelRelationships = this._spatialStructure.itemsByFloor;
         this._model.floorsProperties = this._spatialStructure.floorProperties;
         this._model.allTypes = IfcCategoryMap;
@@ -67864,7 +67881,7 @@ class DataConverter {
         const categoryID = this._categories[id];
         const isUnique = data.instances.length === 1;
         const isInstanced = this._settings.instancedCategories.has(categoryID);
-        if (!isUnique || isInstanced) {
+        if ((!isUnique || isInstanced) || (isUnique && data.instances[0].voids)) {
             this.processInstancedItems(data);
         }
         else {
@@ -67907,6 +67924,10 @@ class DataConverter {
         fragment.mesh.updateMatrix();
         this._model.fragments.push(fragment);
         this._model.add(fragment.mesh);
+        let hasVoids = false;
+        if (data.instances.length == 1) {
+            hasVoids = data.instances[0].voids;
+        }
         let isTransparent = false;
         const materialIDs = Object.keys(data.geometriesByMaterial);
         const mats = materialIDs.map((id) => this._materials[id]);
@@ -67914,9 +67935,6 @@ class DataConverter {
             if (mat.transparent) {
                 isTransparent = true;
             }
-        }
-        if (isTransparent) {
-            return;
         }
         const baseHelper = this.getTransformHelper([fragment.mesh.geometry]);
         for (let i = 0; i < fragment.mesh.count; i++) {
@@ -67927,7 +67945,12 @@ class DataConverter {
             instanceHelper.applyMatrix4(instanceTransform);
             instanceHelper.updateMatrix();
             const id = fragment.getItemID(i, 0);
-            this._boundingBoxes[id] = instanceHelper.matrix.elements;
+            if (isTransparent || hasVoids) {
+                this._transparentBoundingBoxes[id] = instanceHelper.matrix.elements;
+            }
+            else {
+                this._boundingBoxes[id] = instanceHelper.matrix.elements;
+            }
             const guid = fragment.mesh.uuid;
             const max = new THREE$1.Vector3(0.5, 0.5, 0.5);
             const min = new THREE$1.Vector3(-0.5, -0.5, -0.5);
@@ -67998,7 +68021,6 @@ class DataConverter {
         const geometries = Object.values(this._uniqueItems[category][level]);
         const { buffer, ids } = this.processIDsAndBuffer(geometries);
         const mats = this.getUniqueItemMaterial(category, level);
-        console.log(geometries, ids.size);
         const items = {};
         for (const geometryGroup of geometries) {
             for (const geom of geometryGroup) {
@@ -68107,7 +68129,17 @@ class IfcFragmentLoader {
         this.loadOptionalCategories();
         this.loadMainCategories();
     }
-    loadMainCategories() {
+    async loadMainCategories() {
+        const voidsList = [];
+        const voids = this._webIfc.GetLineIDsWithType(0, IFCRELVOIDSELEMENT);
+        for (let i = 0; i < voids.size(); i++) {
+            const voidsParameters = await this._webIfc.properties.getItemProperties(0, voids.get(i));
+            const voidElement = voidsParameters.RelatingBuildingElement.value;
+            if (voidsList.indexOf(voidElement) == -1) {
+                voidsList.push(voidElement);
+            }
+        }
+        this._geometry.setVoids(voidsList);
         this._webIfc.StreamAllMeshes(0, (mesh) => {
             this._progress.updateLoadProgress();
             this._geometry.streamMesh(this._webIfc, mesh);

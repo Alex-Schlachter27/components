@@ -61,7 +61,18 @@ export class IfcFragmentLoader {
     this.loadMainCategories();
   }
 
-  private loadMainCategories() {
+  private async loadMainCategories() {
+
+    const voidsList: any = [];
+    const voids = this._webIfc.GetLineIDsWithType(0, WEBIFC.IFCRELVOIDSELEMENT);
+    for (let i = 0; i < voids.size(); i++) {
+      const voidsParameters = await this._webIfc.properties.getItemProperties(0, voids.get(i));
+      const voidElement = voidsParameters.RelatingBuildingElement.value;
+      if (voidsList.indexOf(voidElement) == -1) {
+        voidsList.push(voidElement);
+      }
+    }
+    this._geometry.setVoids(voidsList);
     this._webIfc.StreamAllMeshes(0, (mesh: WEBIFC.FlatMesh) => {
       this._progress.updateLoadProgress();
       this._geometry.streamMesh(this._webIfc, mesh);

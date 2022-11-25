@@ -9,6 +9,7 @@ export class FragmentGroup extends THREE.Group {
   floorsProperties: any;
   coordinationMatrix: any;
   boundingBoxes: any;
+  transparentBoundingBoxes: any;
 }
 
 export interface GeometriesByMaterial {
@@ -19,7 +20,7 @@ export interface GeometriesByMaterial {
 }
 
 export interface FragmentData {
-  instances: { id: number; matrix: THREE.Matrix4 }[];
+  instances: { id: number; matrix: THREE.Matrix4; voids: boolean }[];
   geometriesByMaterial: { [materialID: string]: THREE.BufferGeometry[] };
   referenceMatrix: THREE.Matrix4;
 }
