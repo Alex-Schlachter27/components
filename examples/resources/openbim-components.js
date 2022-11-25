@@ -67972,18 +67972,159 @@ class DataConverter {
                 points.push(geom.boundingBox.max);
             }
         }
-        const bbox = new THREE$1.Box3();
-        bbox.setFromPoints(points);
-        const width = bbox.max.x - bbox.min.x;
-        const height = bbox.max.y - bbox.min.y;
-        const depth = bbox.max.z - bbox.min.z;
-        const positionX = bbox.min.x + width / 2;
-        const positionY = bbox.min.y + height / 2;
-        const positionZ = bbox.min.z + depth / 2;
-        baseHelper.scale.set(width, height, depth);
-        baseHelper.position.set(positionX, positionY, positionZ);
-        baseHelper.updateMatrix();
+        let cenx = 0;
+        let ceny = 0;
+        let cenz = 0;
+        let num = 0;
+        for (const geom of geometries) {
+            const positions = geom.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                cenx += positions[i];
+                ceny += positions[i + 1];
+                cenz += positions[i + 2];
+                num++;
+            }
+        }
+        if (num > 0) {
+            cenx /= num;
+            ceny /= num;
+            cenz /= num;
+        }
+        let cen = new THREE$1.Vector3(cenx, ceny, cenz);
+        let vx = new THREE$1.Vector3();
+        let vy = new THREE$1.Vector3();
+        let vz = new THREE$1.Vector3();
+        let newDimx = 0;
+        let newDimy = 0;
+        let newDimz = 0;
+        let despx = 0;
+        let despy = 0;
+        let despz = 0;
+        let volumPrev = 10000000000000;
+        for (let r = 0; r < 9; r++) {
+            let vvx = new THREE$1.Vector3();
+            if (r == 0) {
+                vvx = new THREE$1.Vector3(1, 1, 1);
+            }
+            if (r == 1) {
+                vvx = new THREE$1.Vector3(1, 0, 1);
+            }
+            if (r == 2) {
+                vvx = new THREE$1.Vector3(1, -1, 1);
+            }
+            if (r == 3) {
+                vvx = new THREE$1.Vector3(1, 1, 0);
+            }
+            if (r == 4) {
+                vvx = new THREE$1.Vector3(1, 0, 0);
+            }
+            if (r == 5) {
+                vvx = new THREE$1.Vector3(1, -1, 0);
+            }
+            if (r == 6) {
+                vvx = new THREE$1.Vector3(1, 1, -1);
+            }
+            if (r == 7) {
+                vvx = new THREE$1.Vector3(1, 0, -1);
+            }
+            if (r == 8) {
+                vvx = new THREE$1.Vector3(1, -1, -1);
+            }
+            vvx.normalize();
+            let vvy = new THREE$1.Vector3(vvx.x, vvx.y, vvx.z);
+            vvy.cross(new THREE$1.Vector3(0, 0, 1));
+            let vvz = new THREE$1.Vector3(vvy.x, vvy.y, vvy.z);
+            vvz.cross(vvx);
+            vvx.normalize();
+            vvy.normalize();
+            vvz.normalize();
+            let mabX = -1e+10;
+            let mabY = -1e+10;
+            let mabZ = -1e+10;
+            let mibX = 1e+10;
+            let mibY = 1e+10;
+            let mibZ = 1e+10;
+            for (const geom of geometries) {
+                const positions = geom.attributes.position.array;
+                for (let i = 0; i < positions.length; i += 3) {
+                    const x = positions[i];
+                    const y = positions[i + 1];
+                    const z = positions[i + 2];
+                    const dx = x - cen.x;
+                    const dy = y - cen.y;
+                    const dz = z - cen.z;
+                    let vp = new THREE$1.Vector3(dx, dy, dz);
+                    const newX = vvx.dot(vp);
+                    const newY = vvy.dot(vp);
+                    const newZ = vvz.dot(vp);
+                    if (newX > mabX) {
+                        mabX = newX;
+                    }
+                    if (newY > mabY) {
+                        mabY = newY;
+                    }
+                    if (newZ > mabZ) {
+                        mabZ = newZ;
+                    }
+                    if (newX < mibX) {
+                        mibX = newX;
+                    }
+                    if (newY < mibY) {
+                        mibY = newY;
+                    }
+                    if (newZ < mibZ) {
+                        mibZ = newZ;
+                    }
+                }
+            }
+            let newDix = (mabX - mibX);
+            let newDiy = (mabY - mibY);
+            let newDiz = (mabZ - mibZ);
+            const volume = newDix * newDiy * newDiz;
+            if (volume < volumPrev) {
+                volumPrev = volume;
+                vx = vvx;
+                vy = vvy;
+                vz = vvz;
+                newDimx = newDix;
+                newDimy = newDiy;
+                newDimz = newDiz;
+                despx = (mabX + mibX) / 2;
+                despy = (mabY + mibY) / 2;
+                despz = (mabZ + mibZ) / 2;
+            }
+        }
+        cen.x += despx * vx.x;
+        cen.y += despx * vx.y;
+        cen.z += despx * vx.z;
+        cen.x += despy * vy.x;
+        cen.y += despy * vy.y;
+        cen.z += despy * vy.z;
+        cen.x += despz * vz.x;
+        cen.y += despz * vz.y;
+        cen.z += despz * vz.z;
+        vx = vx.setLength(newDimx);
+        vy = vy.setLength(newDimy);
+        vz = vz.setLength(newDimz);
+        baseHelper.matrix = new Matrix4();
+        baseHelper.matrix.set(vx.x, vx.y, vx.z, 0, vy.x, vy.y, vy.z, 0, vz.x, vz.y, vz.z, 0, cen.x, cen.y, cen.z, 1);
+        baseHelper.matrix.transpose();
         return baseHelper;
+        // const bbox = new THREE.Box3();
+        // bbox.setFromPoints(points);
+        // const width = bbox.max.x - bbox.min.x;
+        // const height = bbox.max.y - bbox.min.y;
+        // const depth = bbox.max.z - bbox.min.z;
+        // const positionX = bbox.min.x + width / 2;
+        // const positionY = bbox.min.y + height / 2;
+        // const positionZ = bbox.min.z + depth / 2;
+        // baseHelper.scale.set(width, height, depth);
+        // baseHelper.position.set(positionX, positionY, positionZ);
+        // console.log("pmax", p1);
+        // console.log("pmin", p2);
+        // console.log(baseHelper.matrix);
+        // baseHelper.updateMatrix();
+        // return baseHelper;
     }
     setFragmentInstances(data, fragment) {
         for (let i = 0; i < data.instances.length; i++) {
