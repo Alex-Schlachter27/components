@@ -254,19 +254,26 @@ export class DataConverter {
 
     let volumPrev = 10000000000000;
 
-    for (let r = 0; r < 9; r++) {
+    for (let r = 0; r < 15; r++) {
 
       let vvx = new THREE.Vector3();
 
-      if (r == 0) { vvx = new THREE.Vector3(1, 1, 1); }
+      if (r == 0) { vvx = new THREE.Vector3(1, 0, 0); }
       if (r == 1) { vvx = new THREE.Vector3(1, 0, 1); }
-      if (r == 2) { vvx = new THREE.Vector3(1, -1, 1); }
-      if (r == 3) { vvx = new THREE.Vector3(1, 1, 0); }
-      if (r == 4) { vvx = new THREE.Vector3(1, 0, 0); }
-      if (r == 5) { vvx = new THREE.Vector3(1, -1, 0); }
-      if (r == 6) { vvx = new THREE.Vector3(1, 1, -1); }
-      if (r == 7) { vvx = new THREE.Vector3(1, 0, -1); }
-      if (r == 8) { vvx = new THREE.Vector3(1, -1, -1); }
+      if (r == 2) { vvx = new THREE.Vector3(1, 1, 0); }
+      if (r == 3) { vvx = new THREE.Vector3(1, 1, 1); }
+      if (r == 4) { vvx = new THREE.Vector3(0, 1, 1); }
+      if (r == 5) { vvx = new THREE.Vector3(1, 0, 0.5); }
+      if (r == 6) { vvx = new THREE.Vector3(1, 0.5, 0); }
+      if (r == 7) { vvx = new THREE.Vector3(1, 1, 0.5); }
+      if (r == 8) { vvx = new THREE.Vector3(0, 1, 0.5); }
+      if (r == 9) { vvx = new THREE.Vector3(0.5, 0, 1); }
+      if (r == 10) { vvx = new THREE.Vector3(0.5, 1, 0); }
+      if (r == 11) { vvx = new THREE.Vector3(0.5, 1, 1); }
+      if (r == 12) { vvx = new THREE.Vector3(0, 0.5, 1); }
+      if (r == 13) { vvx = new THREE.Vector3(0.5, 0.5, 1); }
+      if (r == 14) { vvx = new THREE.Vector3(1, 0.5, 0.5); }
+
       vvx.normalize();
 
       let vvy = new THREE.Vector3(vvx.x, vvx.y, vvx.z);
